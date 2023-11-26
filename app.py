@@ -1,0 +1,122 @@
+from flask import Flask, render_template, request # This is different from requests
+import speech_recognition as sr
+from googletrans import Translator
+from gtts import gTTS
+import os
+from playsound import playsound
+
+
+app = Flask(__name__)
+
+def takeinput():
+    '''It takes microphone input from the user and return string output'''
+    r = sr.Recognizer()
+    with sr.Microphone() as source:
+        r.adjust_for_ambient_noise(source)
+        print("Listening......")
+        r.pause_threshold = 1
+        audio = r.listen(source)       
+
+    try:
+        print("Recongnizing......")
+        query = r.recognize_google(audio, language="en-in")
+        print(f"User Said: {query}\n")
+
+    except Exception as e:
+        print("Say that again please....")
+        return "None"
+    return query
+
+@app.route("/")
+@app.route("/index")
+
+
+def index():    
+    return render_template("index.html")
+
+@app.route("/about")
+def about():    
+    return render_template("about.html")
+
+@app.route("/error_page")
+def error_page():
+    return render_template("error_page.html")
+
+@app.route("/getData")
+def get_data():
+    try:
+        op = request.args.get("operation") # Select operation
+        source_text = request.args.get("source_text") # Source text given by the user for translation
+        
+        target_lang = request.args.get("target_language") # Target language selected by the user
+
+        if op == "S2ST" and bool(target_lang): # Speech To Speech Translation
+            source_text = takeinput()
+            audio_trans_text = Translator()
+            text_to_translate = audio_trans_text.translate(source_text, dest=target_lang)
+            tran_text = text_to_translate.text
+
+            speak = gTTS(text=tran_text, lang=target_lang, slow=False)        
+
+            # Using save() method to save the translated
+            # speech in capture_voice.mp3
+            speak.save("captured_voice.mp3")
+
+            # Using OS module to run the translated voice.
+            playsound('captured_voice.mp3')
+            os.remove('captured_voice.mp3')
+           
+            return render_template("index.html",
+                                translated_text = tran_text)       
+     
+        elif op == "S2TT": # Speech To Text Translation
+            source_text = takeinput()
+            audio_trans_text = Translator()
+            text_to_translate = audio_trans_text.translate(source_text, dest=target_lang)
+            tran_text = text_to_translate.text
+
+            return render_template("index.html",
+                                translated_text = tran_text)       
+        
+        elif op == "T2ST" and bool(target_lang): # Text To Speech Translation
+
+            text_trans = Translator()
+            text_to_translate = text_trans.translate(source_text, dest=target_lang)
+            tran_text = text_to_translate.text
+            
+            
+            speak = gTTS(text=tran_text, lang=target_lang, slow=False)        
+
+            # Using save() method to save the translated
+            # speech in capture_voice.mp3
+            speak.save("captured_voice.mp3")
+
+            # Using OS module to run the translated voice.
+            playsound('captured_voice.mp3')
+            os.remove('captured_voice.mp3')
+            
+            return render_template("index.html",
+                                translated_text = tran_text)
+        
+        elif (op == "T2TT" and bool(target_lang)) and bool(source_text.strip()): # Text To Text Translation       
+
+            text_trans = Translator()
+            text_to_translate = text_trans.translate(source_text, dest=target_lang)
+            tran_text = text_to_translate.text
+
+            return render_template("index.html",
+                                translated_text = tran_text)
+        elif op == "ASR":
+            return f"{op} Under Construction"
+
+        else:
+            return render_template ("index.html",
+                                    translated_text = 'Provide "Operation"/"Target Language"/"Text"')
+    except Exception as e:
+        return render_template ("error_page.html",
+                                error_input = str(e).capitalize())
+                                    
+if __name__ == "__main__":
+
+    app.run(host="0.0.0.0", port = 8000, debug=True) # code for run on local machine
+   
